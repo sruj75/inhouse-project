@@ -152,7 +152,7 @@ def global_insights():
 # ----------------------- Tabs -----------------------
 def expenses_tab():
     st.header("Expenses")
-    with st.expander("Budgeting Tips", expanded=True):
+    with st.expander("Budgeting Tips", expanded=False):
         st.markdown(
             """
 1. Track fixed and variable expenses.
@@ -180,41 +180,121 @@ def expenses_tab():
             ))
             db.commit()
             st.success("Expense added!")
-    st.subheader("Expense Log")
-    expenses = db.query(Transaction).filter(Transaction.type == "Expense").order_by(Transaction.date).all()
-    if expenses:
-        for trans in expenses:
-            st.write(f"{trans.date} | {trans.category} | ₹{trans.amount:.2f} | {trans.description}")
-    else:
-        st.info("No expenses recorded yet.")
+
+    # Collapsible Expense Log
+    with st.expander("View Expense Log", expanded=False):
+        expenses = db.query(Transaction).filter(Transaction.type == "Expense").order_by(Transaction.date).all()
+        if expenses:
+            for trans in expenses:
+                cols = st.columns([4, 1, 1])
+                with cols[0]:
+                    st.write(f"{trans.date} | {trans.category} | ₹{trans.amount:.2f} | {trans.description}")
+                with cols[1]:
+                    if st.button("Edit", key=f"edit_{trans.id}"):
+                        edit_expense(trans)
+                with cols[2]:
+                    if st.button("Delete", key=f"delete_{trans.id}"):
+                        delete_expense(trans.id)
+        else:
+            st.info("No expenses recorded yet.")
+
+def edit_expense(trans):
+    """Function to edit an existing expense."""
+    with st.form(f"edit_expense_{trans.id}", clear_on_submit=True):
+        expense_date = st.date_input("Expense Date", value=datetime.strptime(trans.date, "%Y-%m-%d"))
+        expense_description = st.text_input("Description", value=trans.description)
+        expense_amount = st.number_input("Amount (₹)", min_value=0.0, step=0.01, value=trans.amount)
+        expense_category = st.selectbox("Category", ["Rent", "Groceries", "Utilities", "Transportation", 
+                                                       "Entertainment", "Dining Out", "Healthcare", "Other"], index=get_category_index(trans.category))
+        expense_nature = st.selectbox("Expense Nature", ["Need", "Want"], index=get_nature_index(trans.description))
+        
+        if st.form_submit_button("Update Expense"):
+            trans.date = expense_date.strftime("%Y-%m-%d")
+            trans.description = expense_description
+            trans.amount = expense_amount
+            trans.category = expense_category
+            db.commit()
+            st.success("Expense updated!")
+
+def delete_expense(expense_id):
+    """Function to delete an expense."""
+    db.query(Transaction).filter(Transaction.id == expense_id).delete()
+    db.commit()
+    st.success("Expense deleted!")
+
+def get_category_index(category):
+    """Helper function to get the index of the category for the selectbox."""
+    categories = ["Rent", "Groceries", "Utilities", "Transportation", 
+                  "Entertainment", "Dining Out", "Healthcare", "Other"]
+    return categories.index(category)
+
+def get_nature_index(description):
+    """Helper function to determine if the expense is a Need or Want."""
+    return 0 if "[Need]" in description else 1
 
 def income_tab():
     st.header("Income")
+    
     with st.form("income_form", clear_on_submit=True):
         income_date = st.date_input("Income Date", value=datetime.today())
         income_description = st.text_input("Description")
         income_amount = st.number_input("Amount (₹)", min_value=0.0, step=0.01)
+        income_category = st.selectbox("Category", ["Salary", "Freelance", "Investment", "Other"])
+        
         if st.form_submit_button("Add Income"):
             db.add(Transaction(
                 date=income_date.strftime("%Y-%m-%d"),
                 type="Income",
-                category="Income",
+                category=income_category,
                 amount=income_amount,
                 description=income_description
             ))
             db.commit()
             st.success("Income added!")
-    if st.button("Reset Income"):
-        db.query(Transaction).filter(Transaction.type == "Income").delete()
-        db.commit()
-        st.success("Income data reset.")
-    st.subheader("Income Log")
-    incomes = db.query(Transaction).filter(Transaction.type == "Income").order_by(Transaction.date).all()
-    if incomes:
-        for trans in incomes:
-            st.write(f"{trans.date} | ₹{trans.amount:.2f}")
-    else:
-        st.info("No income recorded yet.")
+
+    # Collapsible Income Log
+    with st.expander("View Income Log", expanded=False):
+        incomes = db.query(Transaction).filter(Transaction.type == "Income").order_by(Transaction.date).all()
+        if incomes:
+            for trans in incomes:
+                cols = st.columns([4, 1, 1])
+                with cols[0]:
+                    st.write(f"{trans.date} | {trans.category} | ₹{trans.amount:.2f} | {trans.description}")
+                with cols[1]:
+                    if st.button("Edit", key=f"edit_income_{trans.id}"):
+                        edit_income(trans)
+                with cols[2]:
+                    if st.button("Delete", key=f"delete_income_{trans.id}"):
+                        delete_income(trans.id)
+        else:
+            st.info("No income recorded yet.")
+
+def edit_income(trans):
+    """Function to edit an existing income."""
+    with st.form(f"edit_income_{trans.id}", clear_on_submit=True):
+        income_date = st.date_input("Income Date", value=datetime.strptime(trans.date, "%Y-%m-%d"))
+        income_description = st.text_input("Description", value=trans.description)
+        income_amount = st.number_input("Amount (₹)", min_value=0.0, step=0.01, value=trans.amount)
+        income_category = st.selectbox("Category", ["Salary", "Freelance", "Investment", "Other"], index=get_income_category_index(trans.category))
+        
+        if st.form_submit_button("Update Income"):
+            trans.date = income_date.strftime("%Y-%m-%d")
+            trans.description = income_description
+            trans.amount = income_amount
+            trans.category = income_category
+            db.commit()
+            st.success("Income updated!")
+
+def delete_income(income_id):
+    """Function to delete an income."""
+    db.query(Transaction).filter(Transaction.id == income_id).delete()
+    db.commit()
+    st.success("Income deleted!")
+
+def get_income_category_index(category):
+    """Helper function to get the index of the income category for the selectbox."""
+    categories = ["Salary", "Freelance", "Investment", "Other"]
+    return categories.index(category)
 
 def investments_tab():
     st.header("Investments")
@@ -233,20 +313,46 @@ def investments_tab():
             ))
             db.commit()
             st.success("Investment added!")
-    st.subheader("Investment Log")
-    investments = db.query(Transaction).filter(Transaction.type == "Investment").order_by(Transaction.date).all()
-    if investments:
-        for trans in investments:
-            try:
-                growth = float(trans.description)
-            except:
-                growth = 0.0
-            inv_date = datetime.strptime(trans.date, "%Y-%m-%d")
-            years = (datetime.today() - inv_date).days / 365.25
-            current_value = trans.amount * ((1 + growth/100) ** years)
-            st.write(f"{trans.date} | {trans.category} | Invested: ₹{trans.amount:.2f} | Growth: {growth:.2f}% | Value: ₹{current_value:.2f}")
-    else:
-        st.info("No investments recorded yet.")
+
+    # Collapsible Investment Log
+    with st.expander("View Investment Log", expanded=False):
+        investments = db.query(Transaction).filter(Transaction.type == "Investment").order_by(Transaction.date).all()
+        if investments:
+            for trans in investments:
+                cols = st.columns([4, 1, 1])
+                with cols[0]:
+                    st.write(f"{trans.date} | {trans.category} | Invested: ₹{trans.amount:.2f} | Growth: {trans.description}%")
+                with cols[1]:
+                    if st.button("Edit", key=f"edit_investment_{trans.id}"):
+                        edit_investment(trans)
+                with cols[2]:
+                    if st.button("Delete", key=f"delete_investment_{trans.id}"):
+                        delete_investment(trans.id)
+        else:
+            st.info("No investments recorded yet.")
+
+def edit_investment(trans):
+    """Function to edit an existing investment."""
+    with st.form(f"edit_investment_{trans.id}", clear_on_submit=True):
+        investment_date = st.date_input("Investment Date", value=datetime.strptime(trans.date, "%Y-%m-%d"))
+        investment_type = st.selectbox("Investment Type", ["Stocks", "Bonds", "Real Estate", "Crypto", "Other"], 
+                                     index=["Stocks", "Bonds", "Real Estate", "Crypto", "Other"].index(trans.category))
+        investment_amount = st.number_input("Amount Invested (₹)", min_value=0.0, step=0.01, value=trans.amount)
+        annual_growth_rate = st.number_input("Annual Growth (%)", step=0.1, format="%.2f", value=float(trans.description))
+        
+        if st.form_submit_button("Update Investment"):
+            trans.date = investment_date.strftime("%Y-%m-%d")
+            trans.category = investment_type
+            trans.amount = investment_amount
+            trans.description = str(annual_growth_rate)
+            db.commit()
+            st.success("Investment updated!")
+
+def delete_investment(investment_id):
+    """Function to delete an investment."""
+    db.query(Transaction).filter(Transaction.id == investment_id).delete()
+    db.commit()
+    st.success("Investment deleted!")
 
 def budget_planner_tab():
     st.header("Budget Planner (75-10-15 Rule)")
