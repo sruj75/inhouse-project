@@ -1,0 +1,5 @@
+# Ignore Streamlit secrets and configuration
+.streamlit/
+
+# Ignore Python virtual environment
+.venv/
